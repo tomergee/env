@@ -114,6 +114,15 @@ func (c *Client) Create(ctx context.Context, req *ateenvv1alpha.CreateEnvironmen
 }
 
 // Suspend checkpoints and stops the environment using the gRPC EnvironmentService.
+// Get returns the environment's current record and status.
+func (c *Client) Get(ctx context.Context, atespace, id string) (*ateenvv1alpha.Environment, error) {
+	resp, err := c.grpc.GetEnvironment(ctx, &ateenvv1alpha.GetEnvironmentRequest{Id: id, Atespace: atespace})
+	if err != nil {
+		return nil, fromGRPCError(err)
+	}
+	return resp.GetEnvironment(), nil
+}
+
 func (c *Client) Suspend(ctx context.Context, atespace, id string) error {
 	req := &ateenvv1alpha.SuspendEnvironmentRequest{
 		Id:       id,

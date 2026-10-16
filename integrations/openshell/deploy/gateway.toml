@@ -1,0 +1,25 @@
+# OpenShell gateway configuration for the Agent Substrate compute driver.
+# Plaintext, unauthenticated: for a test cluster reached by port-forward only.
+# The driver (openshell-driver-substrate) listens on the Unix socket below,
+# in a volume shared with the gateway container.
+[openshell]
+version = 2
+
+[openshell.gateway]
+bind_address        = "0.0.0.0:8080"
+health_bind_address = "0.0.0.0:8081"
+log_level           = "info"
+compute_driver      = "substrate"
+disable_tls         = true
+
+[openshell.gateway.auth]
+allow_unauthenticated_users = true
+
+[openshell.gateway.gateway_jwt]
+signing_key_path = "/var/lib/openshell/tls/jwt/signing.pem"
+public_key_path  = "/var/lib/openshell/tls/jwt/public.pem"
+kid_path         = "/var/lib/openshell/tls/jwt/kid"
+gateway_id       = "openshell-substrate"
+
+[openshell.drivers.substrate]
+socket_path = "/run/openshell/substrate.sock"

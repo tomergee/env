@@ -1,0 +1,125 @@
+# OpenShell gateway with the Agent Substrate compute driver as a sidecar.
+# Test-cluster shape: one replica, SQLite on an emptyDir, plaintext API.
+# Reach it with: kubectl -n openshell port-forward svc/openshell-gateway 18080:8080
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshell
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openshell-gateway
+  namespace: openshell
+data:
+  gateway.toml: |
+    # OpenShell gateway configuration for the Agent Substrate compute driver.
+    # Plaintext, unauthenticated: for a test cluster reached by port-forward only.
+    # The driver (openshell-driver-substrate) listens on the Unix socket below,
+    # in a volume shared with the gateway container.
+    [openshell]
+    version = 2
+    
+    [openshell.gateway]
+    bind_address        = "0.0.0.0:8080"
+    health_bind_address = "0.0.0.0:8081"
+    log_level           = "info"
+    compute_driver      = "substrate"
+    disable_tls         = true
+    
+    [openshell.gateway.auth]
+    allow_unauthenticated_users = true
+    
+    [openshell.gateway.gateway_jwt]
+    signing_key_path = "/var/lib/openshell/tls/jwt/signing.pem"
+    public_key_path  = "/var/lib/openshell/tls/jwt/public.pem"
+    kid_path         = "/var/lib/openshell/tls/jwt/kid"
+    gateway_id       = "openshell-substrate"
+    
+    [openshell.drivers.substrate]
+    socket_path = "/run/openshell/substrate.sock"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openshell-gateway
+  namespace: openshell
+spec:
+  selector:
+    app: openshell-gateway
+  ports:
+  - name: grpc
+    port: 8080
+    targetPort: 8080
+  - name: health
+    port: 8081
+    targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openshell-gateway
+  namespace: openshell
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openshell-gateway
+  template:
+    metadata:
+      labels:
+        app: openshell-gateway
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+      - name: generate-certs
+        image: ghcr.io/nvidia/openshell/gateway:0.1.4
+        args: ["generate-certs", "--output-dir", "/var/lib/openshell/tls"]
+        env:
+        - {name: HOME, value: /var/lib/openshell}
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/openshell}
+      containers:
+      - name: gateway
+        image: ghcr.io/nvidia/openshell/gateway:0.1.4
+        env:
+        - {name: OPENSHELL_GATEWAY_CONFIG, value: /etc/openshell/gateway.toml}
+        - {name: OPENSHELL_DB_URL, value: "sqlite:/var/lib/openshell/gateway.db?mode=rwc"}
+        - {name: XDG_DATA_HOME, value: /var/lib/openshell}
+        - {name: HOME, value: /var/lib/openshell}
+        - {name: OPENSHELL_TELEMETRY_ENABLED, value: "false"}
+        ports:
+        - {name: grpc, containerPort: 8080}
+        - {name: health, containerPort: 8081}
+        readinessProbe:
+          httpGet: {path: /healthz, port: 8081}
+          periodSeconds: 5
+        volumeMounts:
+        - {name: data, mountPath: /var/lib/openshell}
+        - {name: config, mountPath: /etc/openshell/gateway.toml, subPath: gateway.toml, readOnly: true}
+        - {name: run, mountPath: /run/openshell}
+      - name: driver
+        image: gcr.io/gke-ai-eco-dev/ate-images-glottman/openshell-driver-substrate@sha256:04932a9ba379ab13c3a8b9e4297c736bc84d0b3469a2257fa07d4a4363f7365a
+        args:
+        - --socket=/run/openshell/substrate.sock
+        - --ate-env-api=ate-env-api.ate-env.svc.cluster.local:7777
+        - --atespace=ate-env
+        - --template=$(OPENSHELL_BASE_TEMPLATE)
+        - --gateway-endpoint=http://openshell-gateway.openshell.svc.cluster.local:8080
+        - --log-level=trace
+        - --keep-failed
+        env:
+        - {name: OPENSHELL_BASE_TEMPLATE, value: openshell-microvm}
+        volumeMounts:
+        - {name: run, mountPath: /run/openshell}
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: openshell-gateway

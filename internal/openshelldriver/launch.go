@@ -242,8 +242,23 @@ func (d *Driver) launch(ctx context.Context, e *env.Env, rec *sandbox, spec *com
 	// binds below 1024; OpenShell's Docker and Kubernetes drivers set the same
 	// sysctl on the workload. The actor runs as root and /proc/sys is
 	// writable, so the guest can set it directly.
+	// Name resolution: OpenShell's drivers point the workload at the sandbox's
+	// DNS relay (127.0.0.53) and nothing else, while the supervisor takes its
+	// trusted upstream from the first literal nameserver in /etc/resolv.conf.
+	// Both read the same file here (the actor has no CAP_SYS_ADMIN for a
+	// private mount namespace), so the file lists the actor's resolver first
+	// and the relay second: the supervisor uses the first; the workload's
+	// first query is refused at once by the broker and glibc falls through
+	// to the relay. The search list goes: with ndots:5 every lookup would
+	// first reach the relay as cluster-suffixed names and be staged for
+	// policy review.
 	if err := d.sh(ctx, e, fmt.Sprintf(`B=%s/bin/busybox
 echo 0 > /proc/sys/net/ipv4/ip_unprivileged_port_start
+if ! $B grep -q '^nameserver 127\.0\.0\.53' /etc/resolv.conf; then
+  up=$($B awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf)
+  [ -n "$up" ] || { echo "no nameserver in /etc/resolv.conf" >&2; exit 1; }
+  $B printf 'nameserver %%s\nnameserver 127.0.0.53\noptions timeout:2 attempts:2\n' "$up" > /etc/resolv.conf
+fi
 $B mkdir -p %s %s %s %s %s %s
 $B rm -f %s %s %s
 $B chmod 0700 %s

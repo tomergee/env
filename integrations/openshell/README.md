@@ -18,7 +18,10 @@ Substrate `v0.4.0-83-g960997ab` with the `microvm` sandbox class.
 | `openshell sandbox exec t3 -- id` | `uid=65534(nobody)` on kernel 6.18.35 in the unmodified image, cwd `/sandbox` |
 | `openshell sandbox stop` | supervisor and sandbox ended, actor SUSPENDED; Stopped after 10 s; a second `stop` is a no-op |
 | `openshell sandbox start` | actor resumed, both binaries relaunched with the fresh credentials; Ready after 12 s; `/sandbox` kept its files; two stop/start cycles in a row |
-| `openshell sandbox delete` | environment deleted |
+| `openshell sandbox delete` | environment deleted; no `os-*` actor left behind |
+| `ssh -F $(openshell sandbox ssh-config …)` command and `ssh -L` to a listener in the sandbox | work through `openshell ssh-proxy` |
+| `openshell sandbox upload` / `download` | work |
+| `getent ahosts example.com` in the workload | answered by the sandbox relay with a policy-DNS synthetic address (198.18.0.2); names outside the policy are staged for review, as on OpenShell's own drivers |
 
 ## Pieces
 
@@ -95,9 +98,19 @@ not resolve tags.
   processes is only possible once the gateway can re-admit a running
   supervisor (M2).
 - The supervisor is not watched: if it exits, the driver still reports Ready.
-- Workload DNS: the actor's `/etc/resolv.conf` names kube-dns; OpenShell's
-  Docker driver points the workload at the sandbox's relay (127.0.0.53).
-  Whether the broker captures DNS to any resolver is not verified yet.
+- Workload DNS rides on one `/etc/resolv.conf` for the whole actor: the
+  actor's resolver first (the supervisor's trusted upstream), the relay
+  127.0.0.53 second (the workload's first query is refused by the broker and
+  glibc falls through). OpenShell's drivers give the workload the relay only.
+  A private mount namespace for the workload would need CAP_SYS_ADMIN on the
+  actor.
+- Egress beyond the gateway is not mapped yet: a policy that allows
+  `example.com:443` resolves, but the actor's EgressPolicy names only the
+  gateway, so the supervisor's upstream connection would be refused. The
+  driver has to derive the EgressPolicy from the sandbox policy (M1). Note
+  that OpenShell itself refuses a raw TCP connect to a `protocol: rest`
+  endpoint (`transparent_tcp_policy_denied`); test the mapping with an HTTP
+  client or a `tcp` rule.
 - One actor hosts the guest, the supervisor and the workload; the outer fence
   is the actor's EgressPolicy rather than `network=none`. See the plan, R3.
 - Each gateway rollout resets its SQLite state (emptyDir) and orphans the

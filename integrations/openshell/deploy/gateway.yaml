@@ -109,8 +109,7 @@ spec:
         - --atespace=ate-env
         - --template=$(OPENSHELL_BASE_TEMPLATE)
         - --gateway-endpoint=http://openshell-gateway.openshell.svc.cluster.local:8080
-        - --log-level=trace
-        - --keep-failed
+        - --log-level=info
         env:
         - {name: OPENSHELL_BASE_TEMPLATE, value: openshell-microvm}
         volumeMounts:

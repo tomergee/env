@@ -16,7 +16,8 @@ Substrate `v0.4.0-83-g960997ab` with the `microvm` sandbox class.
 | the same on a gVisor actor | fails after the privilege drop (`read /proc/self/status: EACCES`); gVisor has no Landlock either |
 | `openshell sandbox create --from debian@sha256:… -- sleep 3600` | Ready in about 15 s (create returns after 12 s) |
 | `openshell sandbox exec t3 -- id` | `uid=65534(nobody)` on kernel 6.18.35 in the unmodified image, cwd `/sandbox` |
-| `openshell sandbox stop` | actor SUSPENDED in 10 s; the gateway then reports Error and refuses `start` (open, see below) |
+| `openshell sandbox stop` | supervisor and sandbox ended, actor SUSPENDED; Stopped after 10 s; a second `stop` is a no-op |
+| `openshell sandbox start` | actor resumed, both binaries relaunched with the fresh credentials; Ready after 12 s; `/sandbox` kept its files; two stop/start cycles in a row |
 | `openshell sandbox delete` | environment deleted |
 
 ## Pieces
@@ -24,7 +25,7 @@ Substrate `v0.4.0-83-g960997ab` with the `microvm` sandbox class.
 | path | what |
 |---|---|
 | `layer/` | `Dockerfile` for the runtime layer: `openshell-sandbox` (static musl), `openshell-supervisor` with a bundled glibc and loader (`bin/supervisor` wrapper), static busybox. linux/amd64. |
-| `../../cmd/openshell-driver-substrate`, `../../internal/openshelldriver` | the compute driver: `openshell.compute.v1.ComputeDriver` over a Unix socket, built on `clients/go`. `bootstrap.go` is the OpenShell v0.1.4 launch contract; `launch.go` stages it in the actor and starts the binaries. |
+| `../../cmd/openshell-driver-substrate`, `../../internal/openshelldriver` | the compute driver: `openshell.compute.v1.ComputeDriver` over a Unix socket, built on `clients/go`. `bootstrap.go` is the OpenShell v0.1.4 launch contract; `launch.go` stages it in the actor and starts the binaries. `third_party/openshell/` holds NVIDIA's protos (Apache-2.0, copied from v0.1.4) and the Go stubs generated from them. |
 | `deploy/gateway.toml`, `deploy/gateway.yaml` | a plaintext, unauthenticated gateway for a test cluster, with the driver as a sidecar sharing the socket volume. |
 | `hack/egress-policies.sh` | gives every `os-*` actor an EgressPolicy to the gateway. Stand-in until the driver creates the policy itself. |
 
@@ -87,9 +88,12 @@ not resolve tags.
   and it can lose the race against the supervisor's first connection attempt
   (the supervisor retries, so this only slows the first start).
 - Driver records live in memory; a driver restart forgets its sandboxes.
-- `stop` suspends the actor, after which the gateway reports the sandbox as
-  Error and refuses `start`. The mapping of OpenShell's Stop/Start onto
-  suspend/resume needs the gateway's expectations spelled out (M2).
+- `stop` ends the supervisor and the sandbox before it suspends the actor,
+  and `start` relaunches both: the gateway rotates the supervisor's token on
+  every start and rejects the old one, so the processes cannot be kept across
+  a stop. The filesystem survives; a warm Substrate resume with live
+  processes is only possible once the gateway can re-admit a running
+  supervisor (M2).
 - The supervisor is not watched: if it exits, the driver still reports Ready.
 - Workload DNS: the actor's `/etc/resolv.conf` names kube-dns; OpenShell's
   Docker driver points the workload at the sandbox's relay (127.0.0.53).

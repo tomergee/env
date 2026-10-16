@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Go stubs for the OpenShell compute-driver contract, generated into
-# internal/openshelldriver/gen. Run from this directory:
+# internal/openshelldriver/third_party/openshell/gen. Run from this directory:
 #   buf generate
 # with protoc-gen-go v1.36.11 and protoc-gen-go-grpc v1.5.1 on PATH (see the
 # repository's buf.gen.yaml).
@@ -23,23 +23,23 @@ managed:
   override:
     - file_option: go_package
       path: compute_driver.proto
-      value: github.com/agent-substrate/env/internal/openshelldriver/gen/computev1
+      value: github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/computev1
     - file_option: go_package
       path: extension.proto
-      value: github.com/agent-substrate/env/internal/openshelldriver/gen/extensionv1
+      value: github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/extensionv1
     - file_option: go_package
       path: options.proto
-      value: github.com/agent-substrate/env/internal/openshelldriver/gen/optionsv1
+      value: github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/optionsv1
     - file_option: go_package
       path: sandbox.proto
-      value: github.com/agent-substrate/env/internal/openshelldriver/gen/sandboxv1
+      value: github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/sandboxv1
     - file_option: go_package
       path: datamodel.proto
-      value: github.com/agent-substrate/env/internal/openshelldriver/gen/datamodelv1
+      value: github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/datamodelv1
 plugins:
   - local: protoc-gen-go
     out: ../gen
-    opt: module=github.com/agent-substrate/env/internal/openshelldriver/gen
+    opt: module=github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen
   - local: protoc-gen-go-grpc
     out: ../gen
-    opt: module=github.com/agent-substrate/env/internal/openshelldriver/gen
+    opt: module=github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen

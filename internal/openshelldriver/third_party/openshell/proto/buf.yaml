@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # NVIDIA OpenShell extension protos (Apache-2.0), copied verbatim from
-# github.com/NVIDIA/OpenShell at tag v0.1.4, proto/. Only what the compute
+# github.com/NVIDIA/OpenShell at tag v0.1.4, proto/ (see ../README.md). Only what the compute
 # driver contract needs: compute_driver.proto and its import closure.
 version: v2
 modules:

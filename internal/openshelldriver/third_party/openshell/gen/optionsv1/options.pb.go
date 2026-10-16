@@ -148,8 +148,8 @@ const file_options_proto_rawDesc = "" +
 	"globalRole\x12\x14\n" +
 	"\x05scope\x18\x04 \x01(\tR\x05scope:o\n" +
 	"\rauthorization\x12\x1e.google.protobuf.MethodOptions\x18І\x03 \x01(\v2'.openshell.options.v1.AuthorizationRuleR\rauthorization:7\n" +
-	"\x06secret\x12\x1d.google.protobuf.FieldOptions\x18ц\x03 \x01(\bR\x06secretB\xe1\x01\n" +
-	"\x18com.openshell.options.v1B\fOptionsProtoP\x01ZEgithub.com/agent-substrate/env/internal/openshelldriver/gen/optionsv1\xa2\x02\x03OOX\xaa\x02\x14Openshell.Options.V1\xca\x02\x14Openshell\\Options\\V1\xe2\x02 Openshell\\Options\\V1\\GPBMetadata\xea\x02\x16Openshell::Options::V1b\x06proto3"
+	"\x06secret\x12\x1d.google.protobuf.FieldOptions\x18ц\x03 \x01(\bR\x06secretB\xf7\x01\n" +
+	"\x18com.openshell.options.v1B\fOptionsProtoP\x01Z[github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/optionsv1\xa2\x02\x03OOX\xaa\x02\x14Openshell.Options.V1\xca\x02\x14Openshell\\Options\\V1\xe2\x02 Openshell\\Options\\V1\\GPBMetadata\xea\x02\x16Openshell::Options::V1b\x06proto3"
 
 var (
 	file_options_proto_rawDescOnce sync.Once

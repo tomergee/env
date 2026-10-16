@@ -10,9 +10,9 @@
 package computev1
 
 import (
-	extensionv1 "github.com/agent-substrate/env/internal/openshelldriver/gen/extensionv1"
-	_ "github.com/agent-substrate/env/internal/openshelldriver/gen/optionsv1"
-	sandboxv1 "github.com/agent-substrate/env/internal/openshelldriver/gen/sandboxv1"
+	extensionv1 "github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/extensionv1"
+	_ "github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/optionsv1"
+	sandboxv1 "github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/sandboxv1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -2880,8 +2880,8 @@ const file_compute_driver_proto_rawDesc = "" +
 	"\rDeleteSandbox\x12*.openshell.compute.v1.DeleteSandboxRequest\x1a+.openshell.compute.v1.DeleteSandboxResponse\x12j\n" +
 	"\x0eWatchSandboxes\x12+.openshell.compute.v1.WatchSandboxesRequest\x1a).openshell.compute.v1.WatchSandboxesEvent0\x01\x12n\n" +
 	"\x0fEnsureWorkspace\x12,.openshell.compute.v1.EnsureWorkspaceRequest\x1a-.openshell.compute.v1.EnsureWorkspaceResponse\x12n\n" +
-	"\x0fDeleteWorkspace\x12,.openshell.compute.v1.DeleteWorkspaceRequest\x1a-.openshell.compute.v1.DeleteWorkspaceResponseB\xe7\x01\n" +
-	"\x18com.openshell.compute.v1B\x12ComputeDriverProtoP\x01ZEgithub.com/agent-substrate/env/internal/openshelldriver/gen/computev1\xa2\x02\x03OCX\xaa\x02\x14Openshell.Compute.V1\xca\x02\x14Openshell\\Compute\\V1\xe2\x02 Openshell\\Compute\\V1\\GPBMetadata\xea\x02\x16Openshell::Compute::V1b\x06proto3"
+	"\x0fDeleteWorkspace\x12,.openshell.compute.v1.DeleteWorkspaceRequest\x1a-.openshell.compute.v1.DeleteWorkspaceResponseB\xfd\x01\n" +
+	"\x18com.openshell.compute.v1B\x12ComputeDriverProtoP\x01Z[github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/computev1\xa2\x02\x03OCX\xaa\x02\x14Openshell.Compute.V1\xca\x02\x14Openshell\\Compute\\V1\xe2\x02 Openshell\\Compute\\V1\\GPBMetadata\xea\x02\x16Openshell::Compute::V1b\x06proto3"
 
 var (
 	file_compute_driver_proto_rawDescOnce sync.Once

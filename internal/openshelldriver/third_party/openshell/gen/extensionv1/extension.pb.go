@@ -176,8 +176,8 @@ const file_extension_proto_rawDesc = "" +
 	"\x13implementation_name\x18\x02 \x01(\tR\x12implementationName\x125\n" +
 	"\x16implementation_version\x18\x03 \x01(\tR\x15implementationVersion\x125\n" +
 	"\x16supported_capabilities\x18\x04 \x03(\tR\x15supportedCapabilities\x123\n" +
-	"\x15required_capabilities\x18\x05 \x03(\tR\x14requiredCapabilitiesB\xef\x01\n" +
-	"\x1acom.openshell.extension.v1B\x0eExtensionProtoP\x01ZGgithub.com/agent-substrate/env/internal/openshelldriver/gen/extensionv1\xa2\x02\x03OEX\xaa\x02\x16Openshell.Extension.V1\xca\x02\x16Openshell\\Extension\\V1\xe2\x02\"Openshell\\Extension\\V1\\GPBMetadata\xea\x02\x18Openshell::Extension::V1b\x06proto3"
+	"\x15required_capabilities\x18\x05 \x03(\tR\x14requiredCapabilitiesB\x85\x02\n" +
+	"\x1acom.openshell.extension.v1B\x0eExtensionProtoP\x01Z]github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/extensionv1\xa2\x02\x03OEX\xaa\x02\x16Openshell.Extension.V1\xca\x02\x16Openshell\\Extension\\V1\xe2\x02\"Openshell\\Extension\\V1\\GPBMetadata\xea\x02\x18Openshell::Extension::V1b\x06proto3"
 
 var (
 	file_extension_proto_rawDescOnce sync.Once

@@ -28,7 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	env "github.com/agent-substrate/env/clients/go"
-	"github.com/agent-substrate/env/internal/openshelldriver/gen/computev1"
+	"github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/computev1"
 	ateenvv1alpha "github.com/agent-substrate/env/proto/ateenv/v1alpha"
 )
 
@@ -245,9 +245,11 @@ func (d *Driver) launch(ctx context.Context, e *env.Env, rec *sandbox, spec *com
 	if err := d.sh(ctx, e, fmt.Sprintf(`B=%s/bin/busybox
 echo 0 > /proc/sys/net/ipv4/ip_unprivileged_port_start
 $B mkdir -p %s %s %s %s %s %s
+$B rm -f %s %s %s
 $B chmod 0700 %s
 $B chmod 0755 %s %s
 $B chown %d:%d %s %s %s`, d.cfg.LayerRoot, channelDir, supervisorDir, runDir, proxyTLSDir, workspaceDir, supervisorCADir,
+		controlSocketPath, healthSocketPath, sshSocketPath,
 		supervisorDir, supervisorCARoot, supervisorCADir, uid, gid, channelDir, workspaceDir, supervisorCADir)); err != nil {
 		return nil, fmt.Errorf("prepare the actor: %w", err)
 	}

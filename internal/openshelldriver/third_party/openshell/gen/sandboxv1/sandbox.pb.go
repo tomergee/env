@@ -10,7 +10,7 @@
 package sandboxv1
 
 import (
-	datamodelv1 "github.com/agent-substrate/env/internal/openshelldriver/gen/datamodelv1"
+	datamodelv1 "github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/datamodelv1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -2487,8 +2487,8 @@ const file_sandbox_proto_rawDesc = "" +
 	"\fPolicySource\x12\x1d\n" +
 	"\x19POLICY_SOURCE_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15POLICY_SOURCE_SANDBOX\x10\x01\x12\x18\n" +
-	"\x14POLICY_SOURCE_GLOBAL\x10\x02B\xe1\x01\n" +
-	"\x18com.openshell.sandbox.v1B\fSandboxProtoP\x01ZEgithub.com/agent-substrate/env/internal/openshelldriver/gen/sandboxv1\xa2\x02\x03OSX\xaa\x02\x14Openshell.Sandbox.V1\xca\x02\x14Openshell\\Sandbox\\V1\xe2\x02 Openshell\\Sandbox\\V1\\GPBMetadata\xea\x02\x16Openshell::Sandbox::V1b\x06proto3"
+	"\x14POLICY_SOURCE_GLOBAL\x10\x02B\xf7\x01\n" +
+	"\x18com.openshell.sandbox.v1B\fSandboxProtoP\x01Z[github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/sandboxv1\xa2\x02\x03OSX\xaa\x02\x14Openshell.Sandbox.V1\xca\x02\x14Openshell\\Sandbox\\V1\xe2\x02 Openshell\\Sandbox\\V1\\GPBMetadata\xea\x02\x16Openshell::Sandbox::V1b\x06proto3"
 
 var (
 	file_sandbox_proto_rawDescOnce sync.Once

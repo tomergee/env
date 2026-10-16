@@ -35,8 +35,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	env "github.com/agent-substrate/env/clients/go"
-	"github.com/agent-substrate/env/internal/openshelldriver/gen/computev1"
-	"github.com/agent-substrate/env/internal/openshelldriver/gen/extensionv1"
+	"github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/computev1"
+	"github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/extensionv1"
 	ateenvv1alpha "github.com/agent-substrate/env/proto/ateenv/v1alpha"
 )
 
@@ -115,6 +115,7 @@ type sandbox struct {
 	reason, message                string
 	created                        time.Time
 	processes                      []string // guest process ids: sandbox, supervisor
+	spec                           *computev1.DriverSandboxSpec
 }
 
 // Driver implements openshell.compute.v1.ComputeDriver on ate-env.
@@ -376,7 +377,7 @@ func (d *Driver) CreateSandbox(ctx context.Context, req *computev1.CreateSandbox
 		id: sb.GetId(), name: sb.GetName(), namespace: sb.GetNamespace(), workspace: sb.GetWorkspace(),
 		envID: envIDFor(sb.GetId()), image: image, generation: bundle.RuntimeGeneration,
 		identity: identity, phase: phaseCreating, reason: "Starting", message: "creating environment",
-		created: time.Now(),
+		created: time.Now(), spec: spec,
 	}
 	d.mu.Lock()
 	if existing, ok := d.sandboxes[rec.id]; ok && existing.phase != phaseFailed {
@@ -486,33 +487,94 @@ func (d *Driver) StopSandbox(ctx context.Context, req *computev1.StopSandboxRequ
 	if rec == nil {
 		return &computev1.StopSandboxResponse{}, nil
 	}
+	d.mu.Lock()
+	stopped := rec.phase == phaseStopped
+	d.mu.Unlock()
+	if stopped {
+		return &computev1.StopSandboxResponse{}, nil
+	}
+	// A stopped sandbox has no running processes, as with OpenShell's own
+	// drivers: the gateway rotates the supervisor's credentials on the next
+	// start, so the running supervisor could not continue anyway. End both
+	// processes (the guest signals their process groups, which takes the
+	// workload with them), then let Substrate snapshot the idle actor.
+	e := d.client.Env(d.cfg.Atespace, rec.envID)
+	d.killProcesses(ctx, e, rec)
 	if err := d.client.Suspend(ctx, d.cfg.Atespace, rec.envID); err != nil && !errors.Is(err, env.ErrNotFound) {
 		if status.Code(err) != codes.FailedPrecondition { // already suspended
 			return nil, status.Errorf(codes.Internal, "suspend %s: %v", rec.envID, err)
 		}
 	}
-	d.setPhase(rec, phaseStopped, "Stopped", "environment suspended")
+	d.setPhase(rec, phaseStopped, "ContainerStopped", "environment suspended on request")
 	return &computev1.StopSandboxResponse{}, nil
 }
 
-// StartSandbox implements ComputeDriver: wake the environment. Substrate
-// resumes a suspended actor on its first request, so a guest call is the
-// start. Relaunching the OpenShell binaries after a lost supervisor is a
-// follow-up (M2).
+// StartSandbox brings a stopped sandbox back: Substrate resumes the actor on
+// the first guest call, then the sandbox and supervisor start again from the
+// launch authentication minted for this start.
 func (d *Driver) StartSandbox(ctx context.Context, req *computev1.StartSandboxRequest) (*computev1.StartSandboxResponse, error) {
 	rec := d.find(req.GetSandboxId(), req.GetName())
 	if rec == nil {
 		return nil, status.Errorf(codes.NotFound, "sandbox %q/%q not found", req.GetSandboxId(), req.GetName())
 	}
+	if want := req.GetExpectedRuntimeIdentity(); want != "" && want != rec.envID {
+		return nil, status.Errorf(codes.FailedPrecondition, "sandbox %s is environment %s, not %s", rec.id, rec.envID, want)
+	}
+	auth, bundle, err := DecodeLaunchAuthentication(req.GetLaunchAuthentication())
+	if err != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, "start %s: %v", rec.id, err)
+	}
+	log := d.log.With("sandbox", rec.id, "name", rec.name, "environment", rec.envID)
+	if gen := req.GetGenerationId(); gen != "" && gen != bundle.RuntimeGeneration {
+		log.Warn("start generation differs from the supervisor bundle", "generation_id", gen, "bundle", bundle.RuntimeGeneration)
+	}
+	d.setPhase(rec, phaseCreating, "Starting", "environment resuming")
+	fail := func(reason string, err error) (*computev1.StartSandboxResponse, error) {
+		log.Error("start failed", "reason", reason, "err", err)
+		msg := lastLines(err.Error(), 12, 1500)
+		d.setPhase(rec, phaseFailed, reason, msg)
+		return nil, status.Errorf(codes.Internal, "%s: %s", reason, msg)
+	}
 	e := d.client.Env(d.cfg.Atespace, rec.envID)
 	if err := d.waitGuest(ctx, e); err != nil {
-		return nil, status.Errorf(codes.Unavailable, "wake %s: %v", rec.envID, err)
+		return fail("GuestNotReady", err)
 	}
-	d.setPhase(rec, phaseReady, "BackendReady", "environment resumed")
+	d.killProcesses(ctx, e, rec) // leftovers from a start that failed half-way
+	d.mu.Lock()
+	rec.generation = bundle.RuntimeGeneration
+	spec := rec.spec
+	d.mu.Unlock()
+	launch, err := d.launch(ctx, e, rec, spec, auth, bundle)
+	if err != nil {
+		return fail("LaunchFailed", err)
+	}
+	d.mu.Lock()
+	rec.processes = launch.processes
+	rec.fence = &computev1.DriverFenceEvidence{
+		Generation:     rec.generation,
+		EvidenceDigest: launch.fence.EvidenceDigest,
+		ResourceClaims: launch.claims,
+	}
+	d.mu.Unlock()
+	d.setPhase(rec, phaseReady, "BackendReady", "openshell-sandbox and openshell-supervisor started")
+	log.Info("sandbox relaunched", "processes", rec.processes)
 	return &computev1.StartSandboxResponse{RuntimeIdentity: rec.envID}, nil
 }
 
-// DeleteSandbox implements ComputeDriver.
+// killProcesses ends the guest processes recorded for the sandbox, supervisor
+// first. Processes that already exited are not an error.
+func (d *Driver) killProcesses(ctx context.Context, e *env.Env, rec *sandbox) {
+	d.mu.Lock()
+	ids := append([]string(nil), rec.processes...)
+	rec.processes = nil
+	d.mu.Unlock()
+	for i := len(ids) - 1; i >= 0; i-- {
+		if _, err := e.Process(ids[i]).Kill(ctx); err != nil && !errors.Is(err, env.ErrNotFound) {
+			d.log.Warn("kill guest process", "environment", rec.envID, "process", ids[i], "err", err)
+		}
+	}
+}
+
 func (d *Driver) DeleteSandbox(ctx context.Context, req *computev1.DeleteSandboxRequest) (*computev1.DeleteSandboxResponse, error) {
 	rec := d.find(req.GetSandboxId(), req.GetName())
 	if rec == nil {
@@ -639,7 +701,7 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 	d.mu.Lock()
 	p, reason, message := rec.phase, rec.reason, rec.message
 	d.mu.Unlock()
-	ready, deleting := "False", false
+	ready, deleting, suspending := "False", false, false
 	switch p {
 	case phaseReady:
 		ready = "True"
@@ -660,10 +722,15 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 				if p == phaseReady {
 					reason, message = "BackendReady", "environment running"
 				}
-			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_SUSPENDED, ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_SUSPENDING:
+			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_SUSPENDED:
 				if p == phaseReady {
 					reason, message = "BackendReady", "environment suspended; Substrate resumes it on the next request"
 				}
+			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_SUSPENDING:
+				if p == phaseReady {
+					reason, message = "BackendReady", "environment suspending; Substrate resumes it on the next request"
+				}
+				suspending = true
 			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_RESUMING:
 				reason, message = "Starting", "environment resuming"
 			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_CRASHED:
@@ -671,6 +738,26 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_DELETING:
 				deleting = true
 			}
+		}
+	}
+	conditions := []*computev1.DriverCondition{{
+		Type: "Ready", Status: ready, Reason: reason, Message: message, TransitionTime: timestamppb.Now(),
+	}}
+	// The gateway derives Stopped from a Suspended=True condition (or a Ready
+	// reason of ContainerStopped) and treats other Ready=False reasons as a
+	// failure, so a requested stop is reported in those words.
+	if p == phaseStopped {
+		if suspending {
+			conditions = append(conditions, &computev1.DriverCondition{
+				Type: "Suspended", Status: "False", Reason: "PodTerminating",
+				Message: "environment is suspending", TransitionTime: timestamppb.Now(),
+			})
+		} else {
+			conditions[0].Reason, conditions[0].Message = "ContainerStopped", "environment suspended on request"
+			conditions = append(conditions, &computev1.DriverCondition{
+				Type: "Suspended", Status: "True", Reason: "EnvironmentSuspended",
+				Message: "environment suspended on request", TransitionTime: timestamppb.Now(),
+			})
 		}
 	}
 	return &computev1.DriverSandbox{
@@ -681,11 +768,8 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 		Status: &computev1.DriverSandboxStatus{
 			Name:       rec.envID,
 			InstanceId: rec.envID,
-			Conditions: []*computev1.DriverCondition{{
-				Type: "Ready", Status: ready, Reason: reason, Message: message,
-				TransitionTime: timestamppb.Now(),
-			}},
-			Deleting: deleting,
+			Conditions: conditions,
+			Deleting:   deleting,
 			ResolvedIdentity: &computev1.ResolvedWorkloadIdentity{
 				Uid: rec.identity.UID, Gid: rec.identity.GID, SupplementaryGids: rec.identity.SupplementaryGIDs,
 				Source: rec.identity.Source, ResourceDigest: rec.identity.ResourceDigest,

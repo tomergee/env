@@ -10,7 +10,7 @@
 package datamodelv1
 
 import (
-	_ "github.com/agent-substrate/env/internal/openshelldriver/gen/optionsv1"
+	_ "github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/optionsv1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -658,8 +658,8 @@ const file_datamodel_proto_rawDesc = "" +
 	"\x0eWorkspacePhase\x12\x1f\n" +
 	"\x1bWORKSPACE_PHASE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16WORKSPACE_PHASE_ACTIVE\x10\x01\x12\x1f\n" +
-	"\x1bWORKSPACE_PHASE_TERMINATING\x10\x02B\xef\x01\n" +
-	"\x1acom.openshell.datamodel.v1B\x0eDatamodelProtoP\x01ZGgithub.com/agent-substrate/env/internal/openshelldriver/gen/datamodelv1\xa2\x02\x03ODX\xaa\x02\x16Openshell.Datamodel.V1\xca\x02\x16Openshell\\Datamodel\\V1\xe2\x02\"Openshell\\Datamodel\\V1\\GPBMetadata\xea\x02\x18Openshell::Datamodel::V1b\x06proto3"
+	"\x1bWORKSPACE_PHASE_TERMINATING\x10\x02B\x85\x02\n" +
+	"\x1acom.openshell.datamodel.v1B\x0eDatamodelProtoP\x01Z]github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/datamodelv1\xa2\x02\x03ODX\xaa\x02\x16Openshell.Datamodel.V1\xca\x02\x16Openshell\\Datamodel\\V1\xe2\x02\"Openshell\\Datamodel\\V1\\GPBMetadata\xea\x02\x18Openshell::Datamodel::V1b\x06proto3"
 
 var (
 	file_datamodel_proto_rawDescOnce sync.Once

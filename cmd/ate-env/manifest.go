@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/agent-substrate/env/internal/apiservice"
@@ -64,6 +65,35 @@ const (
 	defaultActorMemory = "4Gi"
 )
 
+// defaultSandboxClass is the class of the worker pool unless --sandbox-class
+// says otherwise.
+const defaultSandboxClass = "gvisor"
+
+// sandboxClasses maps the --sandbox-class value to the WorkerPool's class name.
+// Since substrate#2780 the pool alone decides the sandbox; the ActorTemplate
+// names none.
+var sandboxClasses = map[string]atev1alpha1.SandboxClass{
+	"gvisor":  atev1alpha1.SandboxClassGvisor,
+	"microvm": atev1alpha1.SandboxClassMicroVM,
+}
+
+// capabilityName is a Linux capability as Substrate spells it in
+// securityContext.capabilities.add: upper case, no CAP_ prefix.
+var capabilityName = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+
+func resolveSandboxClass(flag, class, config string) (string, string, error) {
+	if class == "" {
+		class = defaultSandboxClass
+	}
+	if _, ok := sandboxClasses[class]; !ok {
+		return "", "", fmt.Errorf("%s %q: want one of gvisor, microvm", flag, class)
+	}
+	if config == "" {
+		config = sandboxConfigName
+	}
+	return class, config, nil
+}
+
 // manifestConfig holds configuration for generating Kubernetes deployment manifests.
 type manifestConfig struct {
 	namespace   string
@@ -74,9 +104,18 @@ type manifestConfig struct {
 	apiImage    string
 	apiReplicas int32
 	apiPort     int32
+	// sandboxClass and sandboxConfig select the WorkerPool's class and the
+	// SandboxConfig its workers run, thus the sandbox of all its actors.
+	sandboxClass  string
+	sandboxConfig string
 }
 
 func (c *manifestConfig) resolveImages() error {
+	class, config, err := resolveSandboxClass("--sandbox-class", c.sandboxClass, c.sandboxConfig)
+	if err != nil {
+		return err
+	}
+	c.sandboxClass, c.sandboxConfig = class, config
 	if c.workerImage == "" {
 		return errors.New(`--worker-image is required: the worker image is
 ateworker-gvisor from the Substrate repo and must match the Substrate version
@@ -122,6 +161,10 @@ type templateConfig struct {
 	// Empty means defaultActorCPU and defaultActorMemory.
 	cpu    string
 	memory string
+	// capAdd are Linux capabilities added to the guest container (Substrate
+	// spelling: SETUID, not CAP_SETUID). Actors run as root with a minimal
+	// set; runtimes that switch identity or bind low ports need more.
+	capAdd []string
 }
 
 // runtimeLayer is a parsed --layer value.
@@ -237,6 +280,14 @@ binaries default it to the ate-env-guest image published with the release
 			return fmt.Errorf("--sidecar-readyz %q: want an http(s) URL", u)
 		}
 	}
+	for _, capName := range c.capAdd {
+		if strings.HasPrefix(capName, "CAP_") {
+			return fmt.Errorf("--cap-add %q: drop the CAP_ prefix (%s)", capName, strings.TrimPrefix(capName, "CAP_"))
+		}
+		if !capabilityName.MatchString(capName) {
+			return fmt.Errorf("--cap-add %q: want an upper-case capability name such as SETUID", capName)
+		}
+	}
 	return nil
 }
 
@@ -277,6 +328,8 @@ the "template" subcommand: ate-env manifest template`,
 	cmd.Flags().Int32Var(&mCfg.apiPort, "api-port", 7777, "port the ate-env-api service listens on")
 	cmd.Flags().StringVar(&mCfg.workerPool, "workerpool", "", "WorkerPool name (defaults to <template>-workerpool)")
 	cmd.Flags().Int32Var(&mCfg.replicas, "replicas", 5, "number of pre-warmed worker pods")
+	cmd.Flags().StringVar(&mCfg.sandboxClass, "sandbox-class", defaultSandboxClass, "sandbox class of the worker pool: gvisor or microvm")
+	cmd.Flags().StringVar(&mCfg.sandboxConfig, "sandbox-config", sandboxConfigName, "name of the SandboxConfig the workers run")
 
 	cmd.AddCommand(newManifestTemplateCommand())
 	cmd.AddCommand(newManifestAccessPolicyCommand())
@@ -358,6 +411,7 @@ It prints YAML to stdout without touching the cluster.`,
 	cmd.Flags().StringArrayVar(&tCfg.layers, "layer", nil, "extra runtime mounted as a read-only image volume, as name=image@sha256:...=/mount/path (repeatable)")
 	cmd.Flags().StringArrayVar(&tCfg.sidecars, "sidecar", nil, "command the guest starts and keeps running next to itself, an absolute binary path plus arguments, e.g. '/opt/opensandbox/execd --port 44772' (repeatable)")
 	cmd.Flags().StringArrayVar(&tCfg.sidecarReadyz, "sidecar-readyz", nil, "URL the actor's readiness waits for, e.g. http://127.0.0.1:44772/ready (repeatable)")
+	cmd.Flags().StringArrayVar(&tCfg.capAdd, "cap-add", nil, "Linux capability added to the guest container, without the CAP_ prefix, e.g. SETUID (repeatable)")
 	cmd.Flags().StringVar(&tCfg.cpu, "cpu", defaultActorCPU, "CPU limit of each actor, a Kubernetes quantity such as 2 or 500m; Substrate requires one")
 	cmd.Flags().StringVar(&tCfg.memory, "memory", defaultActorMemory, "memory limit of each actor, a Kubernetes quantity such as 4Gi; Substrate requires one")
 
@@ -543,8 +597,8 @@ func buildWorkerPool(cfg manifestConfig) *atev1alpha1.WorkerPool {
 			// its snapshot's class. The configRef is the SandboxConfig the
 			// workers run.
 			SandboxClasses: []atev1alpha1.WorkerPoolSandboxClass{{
-				Name:      atev1alpha1.SandboxClassGvisor,
-				ConfigRef: &atev1alpha1.SandboxConfigReference{Name: sandboxConfigName},
+				Name:      sandboxClasses[classOrDefault(cfg.sandboxClass)],
+				ConfigRef: &atev1alpha1.SandboxConfigReference{Name: configOrDefault(cfg.sandboxConfig)},
 			}},
 		},
 	}
@@ -559,7 +613,7 @@ func buildActorTemplate(cfg templateConfig) *ateapipb.ActorTemplate {
 	if pool == "" {
 		pool = defaultWorkerPool(cfg.template)
 	}
-	return &ateapipb.ActorTemplate{
+	tmpl := &ateapipb.ActorTemplate{
 		Metadata: &ateapipb.ResourceMetadata{
 			Name:     cfg.template,
 			Atespace: atespace,
@@ -594,6 +648,26 @@ func buildActorTemplate(cfg templateConfig) *ateapipb.ActorTemplate {
 			{Name: "memory", Quantity: orDefault(cfg.memory, defaultActorMemory)},
 		}},
 	}
+	if len(cfg.capAdd) > 0 {
+		tmpl.Containers[0].SecurityContext = &ateapipb.SecurityContext{
+			Capabilities: &ateapipb.Capabilities{Add: append([]string(nil), cfg.capAdd...)},
+		}
+	}
+	return tmpl
+}
+
+func classOrDefault(class string) string {
+	if class == "" {
+		return defaultSandboxClass
+	}
+	return class
+}
+
+func configOrDefault(config string) string {
+	if config == "" {
+		return sandboxConfigName
+	}
+	return config
 }
 
 func orDefault(v, def string) string {

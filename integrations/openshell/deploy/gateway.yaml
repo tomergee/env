@@ -116,7 +116,7 @@ spec:
         - {name: config, mountPath: /etc/openshell/gateway.toml, subPath: gateway.toml, readOnly: true}
         - {name: run, mountPath: /run/openshell}
       - name: driver
-        image: gcr.io/gke-ai-eco-dev/ate-images-glottman/openshell-driver-substrate@sha256:ec1f4defd7d56cda2c3212d4e64b133d32f0ac47c4baba5c1a089a69ad4e5ea0
+        image: gcr.io/gke-ai-eco-dev/ate-images-glottman/openshell-driver-substrate@sha256:226dbd438d2ce2fd5dd2c41dc991a850dd3ef6f655a8f5d990598a1b8dfc4d54
         args:
         - --socket=/run/openshell/substrate.sock
         - --ate-env-api=ate-env-api.ate-env.svc.cluster.local:7777

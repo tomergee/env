@@ -105,14 +105,6 @@ func (x *AuthorizationRule) GetScope() string {
 
 var file_options_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
-		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
-		ExtensionType: (*AuthorizationRule)(nil),
-		Field:         50000,
-		Name:          "openshell.options.v1.authorization",
-		Tag:           "bytes,50000,opt,name=authorization",
-		Filename:      "options.proto",
-	},
-	{
 		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
 		ExtensionType: (*bool)(nil),
 		Field:         50001,
@@ -122,18 +114,10 @@ var file_options_proto_extTypes = []protoimpl.ExtensionInfo{
 	},
 }
 
-// Extension fields to descriptorpb.MethodOptions.
-var (
-	// Authorization metadata for a gRPC method.
-	//
-	// optional openshell.options.v1.AuthorizationRule authorization = 50000;
-	E_Authorization = &file_options_proto_extTypes[0]
-)
-
 // Extension fields to descriptorpb.FieldOptions.
 var (
 	// optional bool secret = 50001;
-	E_Secret = &file_options_proto_extTypes[1]
+	E_Secret = &file_options_proto_extTypes[0]
 )
 
 var File_options_proto protoreflect.FileDescriptor
@@ -146,8 +130,7 @@ const file_options_proto_rawDesc = "" +
 	"\x0eworkspace_role\x18\x02 \x01(\tR\rworkspaceRole\x12\x1f\n" +
 	"\vglobal_role\x18\x03 \x01(\tR\n" +
 	"globalRole\x12\x14\n" +
-	"\x05scope\x18\x04 \x01(\tR\x05scope:o\n" +
-	"\rauthorization\x12\x1e.google.protobuf.MethodOptions\x18І\x03 \x01(\v2'.openshell.options.v1.AuthorizationRuleR\rauthorization:7\n" +
+	"\x05scope\x18\x04 \x01(\tR\x05scope:7\n" +
 	"\x06secret\x12\x1d.google.protobuf.FieldOptions\x18ц\x03 \x01(\bR\x06secretB\xf7\x01\n" +
 	"\x18com.openshell.options.v1B\fOptionsProtoP\x01Z[github.com/agent-substrate/env/internal/openshelldriver/third_party/openshell/gen/optionsv1\xa2\x02\x03OOX\xaa\x02\x14Openshell.Options.V1\xca\x02\x14Openshell\\Options\\V1\xe2\x02 Openshell\\Options\\V1\\GPBMetadata\xea\x02\x16Openshell::Options::V1b\x06proto3"
 
@@ -165,18 +148,15 @@ func file_options_proto_rawDescGZIP() []byte {
 
 var file_options_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_options_proto_goTypes = []any{
-	(*AuthorizationRule)(nil),          // 0: openshell.options.v1.AuthorizationRule
-	(*descriptorpb.MethodOptions)(nil), // 1: google.protobuf.MethodOptions
-	(*descriptorpb.FieldOptions)(nil),  // 2: google.protobuf.FieldOptions
+	(*AuthorizationRule)(nil),         // 0: openshell.options.v1.AuthorizationRule
+	(*descriptorpb.FieldOptions)(nil), // 1: google.protobuf.FieldOptions
 }
 var file_options_proto_depIdxs = []int32{
-	1, // 0: openshell.options.v1.authorization:extendee -> google.protobuf.MethodOptions
-	2, // 1: openshell.options.v1.secret:extendee -> google.protobuf.FieldOptions
-	0, // 2: openshell.options.v1.authorization:type_name -> openshell.options.v1.AuthorizationRule
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	2, // [2:3] is the sub-list for extension type_name
-	0, // [0:2] is the sub-list for extension extendee
+	1, // 0: openshell.options.v1.secret:extendee -> google.protobuf.FieldOptions
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	0, // [0:1] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
 }
 
@@ -192,7 +172,7 @@ func file_options_proto_init() {
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_options_proto_rawDesc), len(file_options_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
-			NumExtensions: 2,
+			NumExtensions: 1,
 			NumServices:   0,
 		},
 		GoTypes:           file_options_proto_goTypes,

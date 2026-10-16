@@ -599,3 +599,74 @@ func TestManifestTemplateSelectsTheNamedPool(t *testing.T) {
 		t.Errorf("default pool is not <template>-workerpool:\n%s", out.String())
 	}
 }
+
+func TestBuildTemplateCapAdd(t *testing.T) {
+	cfg := testTemplateConfig()
+	cfg.capAdd = []string{"SETPCAP", "SETUID"}
+	cfg.cpu, cfg.memory = "1", "1Gi"
+	if err := cfg.resolveImages(); err != nil {
+		t.Fatalf("resolveImages: %v", err)
+	}
+	tmpl, err := buildTemplate(cfg)
+	if err != nil {
+		t.Fatalf("buildTemplate: %v", err)
+	}
+	caps := tmpl.GetContainers()[0].GetSecurityContext().GetCapabilities().GetAdd()
+	if strings.Join(caps, ",") != "SETPCAP,SETUID" {
+		t.Errorf("capabilities.add = %v", caps)
+	}
+	limits := tmpl.GetResources().GetLimits()
+	if len(limits) != 2 || limits[0].GetName() != "cpu" || limits[0].GetQuantity() != "1" || limits[1].GetName() != "memory" || limits[1].GetQuantity() != "1Gi" {
+		t.Errorf("limits = %v", limits)
+	}
+}
+
+func TestBuildTemplateDefaults(t *testing.T) {
+	tmpl := buildActorTemplate(testTemplateConfig())
+	if tmpl.GetContainers()[0].GetSecurityContext() != nil {
+		t.Errorf("securityContext set without --cap-add: %v", tmpl.GetContainers()[0].GetSecurityContext())
+	}
+	limits := tmpl.GetResources().GetLimits()
+	if len(limits) != 2 || limits[0].GetQuantity() != defaultActorCPU || limits[1].GetQuantity() != defaultActorMemory {
+		t.Errorf("limits = %v, want the defaults %s and %s", limits, defaultActorCPU, defaultActorMemory)
+	}
+}
+
+func TestTemplateConfigRejectsCapsAndQuantities(t *testing.T) {
+	bad := []func(c *templateConfig){
+		func(c *templateConfig) { c.capAdd = []string{"CAP_SETUID"} },
+		func(c *templateConfig) { c.capAdd = []string{"setuid"} },
+	}
+	for i, mutate := range bad {
+		cfg := testTemplateConfig()
+		mutate(&cfg)
+		if err := cfg.resolveImages(); err == nil {
+			t.Errorf("case %d: accepted %+v", i, cfg)
+		}
+	}
+	for _, q := range []func(c *templateConfig){
+		func(c *templateConfig) { c.cpu = "one" },
+		func(c *templateConfig) { c.memory = "1GB2" },
+	} {
+		cfg := testTemplateConfig()
+		q(&cfg)
+		if err := cfg.validateResources(); err == nil {
+			t.Errorf("quantity accepted: %+v", cfg)
+		}
+	}
+}
+
+func TestBuildWorkerPoolMicroVM(t *testing.T) {
+	cfg := testManifestConfig()
+	cfg.sandboxClass = "microvm"
+	cfg.sandboxConfig = "microvm"
+	pool := buildWorkerPool(cfg)
+	sc := pool.Spec.SandboxClasses
+	if len(sc) != 1 || sc[0].Name != atev1alpha1.SandboxClassMicroVM || sc[0].ConfigRef.Name != "microvm" {
+		t.Errorf("sandboxClasses = %+v, want microvm/microvm", sc)
+	}
+	cfg.sandboxClass = "xen"
+	if err := cfg.resolveImages(); err == nil {
+		t.Error("unknown class accepted")
+	}
+}

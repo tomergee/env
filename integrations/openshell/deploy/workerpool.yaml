@@ -1,0 +1,30 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# A microVM worker pool for OpenShell actors. The worker image must be built
+# from the Substrate commit the cluster runs (ate-setup publish worker-images;
+# named ateworker-microvm since Substrate 63a17a92, ateom-microvm before); an
+# older image fails its capacity report. hack/install.sh substitutes the
+# image, the replica count and the names from its environment.
+apiVersion: ate.dev/v1alpha1
+kind: WorkerPool
+metadata:
+  name: openshell-microvm-workerpool
+  namespace: ate-env
+spec:
+  replicas: 2
+  sandboxClasses:
+  - name: microvm
+    configRef:
+      name: microvm
+  workerImage: gcr.io/gke-ai-eco-dev/ate-images-glottman/ateom-microvm@sha256:bcb94ea372cbb81695fafc4374fc9f6abcb7711f2c2beee8cab002bf899762d2

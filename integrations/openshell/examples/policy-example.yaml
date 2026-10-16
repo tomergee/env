@@ -1,0 +1,33 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A minimal OpenShell sandbox policy for `openshell sandbox create --policy`:
+# the workspace is writable and one HTTPS endpoint is allowed read-only.
+# Inside the sandbox, example.com resolves to a policy-DNS address and every
+# other name is staged for review. The actor's own EgressPolicy still has to
+# allow the host before a connection goes through (see the README).
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: []
+  read_write: []
+network_policies:
+  example:
+    name: example-com
+    endpoints:
+      - host: example.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-only

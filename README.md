@@ -30,6 +30,7 @@ while this project adds the environment-shaped API on top.
 - **`clients/go`** — The Go client library to manage environments, run commands, and perform file operations.
 - **`clients/python`** — Python client for environment lifecycle management and batch sandbox orchestration ([README](clients/python/README.md)).
 - **`integrations/nemo-gym`** — A [NeMo Gym](https://github.com/NVIDIA-NeMo/Gym) sandbox provider that runs rollout sandboxes as environments, built on the Python client ([README](integrations/nemo-gym/README.md)).
+- **`integrations/openshell`** — An [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) compute driver that runs OpenShell sandboxes as environments in microVM actors ([README](integrations/openshell/README.md), [design](docs/openshell.md)).
 
 ## Installation
 
@@ -444,6 +445,8 @@ For complete runnable Go programs:
 - **Guest Daemon**: See [guest-daemon](examples/guest-daemon/main.go) to run a standalone in-actor gRPC service for asynchronous process execution and chunked file transfer.
 
 For using environments from a framework, see [integrations/nemo-gym](integrations/nemo-gym/README.md): a NeMo Gym sandbox provider registered through the `nemo_gym.sandbox_providers` entry point.
+
+For running another runtime's sandboxes on environments, see [integrations/openshell](integrations/openshell/README.md): NVIDIA OpenShell's gateway, CLI and policy model with ate-env as the compute, including a Python SDK example.
 
 ## Cleanup
 

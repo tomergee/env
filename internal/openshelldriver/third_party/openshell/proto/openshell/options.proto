@@ -24,10 +24,12 @@ message AuthorizationRule {
   string scope = 4;
 }
 
-extend google.protobuf.MethodOptions {
-  // Authorization metadata for a gRPC method.
-  AuthorizationRule authorization = 50000;
-}
+// The upstream file also extends google.protobuf.MethodOptions with
+// `AuthorizationRule authorization = 50000`. That block is left out of this
+// copy: go.ate.dev/substrate registers `ateapi.method` on MethodOptions with
+// the same number, Go's protobuf registry refuses two extensions with one
+// number in a binary, and the compute-driver contract does not use the
+// option. Only `secret` below is used.
 
 // Marks a protobuf field whose value must not cross generic observation or
 // extension boundaries such as gateway interceptors.

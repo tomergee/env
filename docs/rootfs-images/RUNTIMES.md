@@ -78,6 +78,18 @@ but Docker Hub, is in [`examples/runtime-layers`](../../examples/runtime-layers)
 the static `busybox:1.37-musl` mounted as the layer and its `httpd` as the
 sidecar, run under two different rootfs images.
 
+### OpenShell specifics
+
+NVIDIA OpenShell's two trusted binaries ship the same way, as a layer at
+`/opt/openshell`, but they are not sidecars: each sandbox needs per-sandbox
+credentials that OpenShell's gateway issues at create time, so a compute driver
+writes them through the guest and starts the binaries with `StartProcess`. The
+template also needs the `microvm` class (Landlock and seccomp user-notification
+are not available under gVisor), capabilities for the launcher's identity
+switch (`--cap-add`) and resource limits (`--cpu`, `--memory`). See
+[docs/openshell.md](../openshell.md) and
+[integrations/openshell](../../integrations/openshell/README.md).
+
 ## Who can reach the second runtime
 
 - **Processes inside the environment** reach it at `127.0.0.1:<port>` right

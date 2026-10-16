@@ -701,23 +701,65 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 	d.mu.Lock()
 	p, reason, message := rec.phase, rec.reason, rec.message
 	d.mu.Unlock()
-	ready, deleting, suspending := "False", false, false
-	switch p {
-	case phaseReady:
-		ready = "True"
-	case phaseFailed, phaseCreating, phaseStopped:
-	}
+	var live liveState
 	if p == phaseReady || p == phaseStopped {
 		getCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		info, err := d.client.Get(getCtx, d.cfg.Atespace, rec.envID)
 		cancel()
 		switch {
 		case errors.Is(err, env.ErrNotFound):
-			ready, reason, message = "False", "EnvironmentMissing", "environment no longer exists in ate-env"
+			live.missing = true
 		case err != nil:
 			// keep the recorded state; the API is unreachable right now
 		default:
-			switch info.GetStatus() {
+			live.answered, live.status = true, info.GetStatus()
+		}
+	}
+	conditions, deleting := conditionsFor(p, reason, message, live, timestamppb.Now())
+	return &computev1.DriverSandbox{
+		Id:        rec.id,
+		Name:      rec.name,
+		Namespace: rec.namespace,
+		Workspace: rec.workspace,
+		Status: &computev1.DriverSandboxStatus{
+			Name:       rec.envID,
+			InstanceId: rec.envID,
+			Conditions: conditions,
+			Deleting:   deleting,
+			ResolvedIdentity: &computev1.ResolvedWorkloadIdentity{
+				Uid: rec.identity.UID, Gid: rec.identity.GID, SupplementaryGids: rec.identity.SupplementaryGIDs,
+				Source: rec.identity.Source, ResourceDigest: rec.identity.ResourceDigest,
+			},
+			FenceEvidence: rec.fence,
+		},
+	}
+}
+
+// liveState is what observe learned from ate-env about the environment.
+type liveState struct {
+	answered bool // ate-env-api answered with a status
+	missing  bool // ate-env-api no longer knows the environment
+	status   ateenvv1alpha.EnvironmentStatus
+}
+
+// conditionsFor translates the driver's phase and the environment's live
+// status into the conditions the gateway's phase derivation reads. The
+// gateway's vocabulary is fixed: Ready=True is Ready; Suspended=True while
+// Ready is not True is Stopped; Suspended=False with reason PodTerminating
+// is Stopping; Ready=False with a transient reason (Starting and a few
+// others) is Provisioning, and with any other reason a terminal Error. The
+// second result is the gateway's "deleting" flag.
+func conditionsFor(p phase, reason, message string, live liveState, now *timestamppb.Timestamp) ([]*computev1.DriverCondition, bool) {
+	ready, deleting, suspending := "False", false, false
+	if p == phaseReady {
+		ready = "True"
+	}
+	if p == phaseReady || p == phaseStopped {
+		switch {
+		case live.missing:
+			ready, reason, message = "False", "EnvironmentMissing", "environment no longer exists in ate-env"
+		case live.answered:
+			switch live.status {
 			case ateenvv1alpha.EnvironmentStatus_ENVIRONMENT_STATUS_RUNNING:
 				if p == phaseReady {
 					reason, message = "BackendReady", "environment running"
@@ -741,42 +783,26 @@ func (d *Driver) observe(ctx context.Context, rec *sandbox) *computev1.DriverSan
 		}
 	}
 	conditions := []*computev1.DriverCondition{{
-		Type: "Ready", Status: ready, Reason: reason, Message: message, TransitionTime: timestamppb.Now(),
+		Type: "Ready", Status: ready, Reason: reason, Message: message, TransitionTime: now,
 	}}
-	// The gateway derives Stopped from a Suspended=True condition (or a Ready
-	// reason of ContainerStopped) and treats other Ready=False reasons as a
-	// failure, so a requested stop is reported in those words.
-	if p == phaseStopped {
+	// A requested stop is reported in the gateway's words: Suspended=True
+	// plus the ContainerStopped reason once the actor is suspended, and
+	// Suspended=False/PodTerminating while it still is suspending.
+	if p == phaseStopped && !live.missing {
 		if suspending {
 			conditions = append(conditions, &computev1.DriverCondition{
 				Type: "Suspended", Status: "False", Reason: "PodTerminating",
-				Message: "environment is suspending", TransitionTime: timestamppb.Now(),
+				Message: "environment is suspending", TransitionTime: now,
 			})
 		} else {
 			conditions[0].Reason, conditions[0].Message = "ContainerStopped", "environment suspended on request"
 			conditions = append(conditions, &computev1.DriverCondition{
 				Type: "Suspended", Status: "True", Reason: "EnvironmentSuspended",
-				Message: "environment suspended on request", TransitionTime: timestamppb.Now(),
+				Message: "environment suspended on request", TransitionTime: now,
 			})
 		}
 	}
-	return &computev1.DriverSandbox{
-		Id:        rec.id,
-		Name:      rec.name,
-		Namespace: rec.namespace,
-		Workspace: rec.workspace,
-		Status: &computev1.DriverSandboxStatus{
-			Name:       rec.envID,
-			InstanceId: rec.envID,
-			Conditions: conditions,
-			Deleting:   deleting,
-			ResolvedIdentity: &computev1.ResolvedWorkloadIdentity{
-				Uid: rec.identity.UID, Gid: rec.identity.GID, SupplementaryGids: rec.identity.SupplementaryGIDs,
-				Source: rec.identity.Source, ResourceDigest: rec.identity.ResourceDigest,
-			},
-			FenceEvidence: rec.fence,
-		},
-	}
+	return conditions, deleting
 }
 
 // String renders a short description for logs.

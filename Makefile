@@ -23,7 +23,7 @@ ATE_ENV_API_IMAGE ?=
 ATE_ENV_GUEST_IMAGE ?=
 CLI_LDFLAGS := -X main.version=$(VERSION) -X main.defaultAPIImage=$(ATE_ENV_API_IMAGE) -X main.defaultGuestImage=$(ATE_ENV_GUEST_IMAGE)
 
-.PHONY: build build-cli install test vet clean images python-protos python-test verify-boilerplate verify-gofmt
+.PHONY: build build-cli install test vet clean images openshell-images python-protos python-test verify-boilerplate verify-gofmt
 
 build:
 	go build ./...
@@ -76,3 +76,19 @@ images:
 
 clean:
 	rm -rf bin
+
+# OpenShell runtime: the layer image (openshell-sandbox, openshell-supervisor
+# with its loader, busybox) built with docker buildx for linux/amd64, and the
+# compute driver built with ko. See integrations/openshell/README.md.
+OPENSHELL_VERSION ?= 0.1.4
+openshell-images:
+	@echo "Building and pushing the OpenShell layer and driver images to $(ATE_ENV_IMAGE_REPO)..."
+	@meta=$$(mktemp); \
+	docker buildx build --platform linux/amd64 --push \
+	  -t $(ATE_ENV_IMAGE_REPO)/openshell-layer:$(OPENSHELL_VERSION) \
+	  --metadata-file $$meta integrations/openshell/layer >/dev/null && \
+	layer_digest=$$(sed -n 's/.*"containerimage.digest": *"\([^"]*\)".*/\1/p' $$meta) && rm -f $$meta && \
+	driver_img=$$(KO_DOCKER_REPO=$(ATE_ENV_IMAGE_REPO)/openshell-driver-substrate ko build --bare ./cmd/openshell-driver-substrate | tail -n 1) && \
+	echo "Published:" && \
+	echo "  LAYER_IMAGE=$(ATE_ENV_IMAGE_REPO)/openshell-layer@$$layer_digest" && \
+	echo "  DRIVER_IMAGE=$$driver_img"

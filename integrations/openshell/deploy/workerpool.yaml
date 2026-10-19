@@ -21,6 +21,11 @@ kind: WorkerPool
 metadata:
   name: openshell-microvm-workerpool
   namespace: ate-env
+  labels:
+    # The template selects its pool by this label (ate-env manifest template
+    # --workerpool). Since Substrate 0443aec3 the template names no sandbox
+    # class; the selector keeps OpenShell actors on this microvm pool.
+    ate-env/workerpool: openshell-microvm-workerpool
 spec:
   replicas: 2
   sandboxClasses:

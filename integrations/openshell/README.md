@@ -40,10 +40,11 @@ v0.1.4, kata guest kernel 6.18.35:
 ## Install
 
 Prerequisites: a cluster with ate-env deployed (`ate-env manifest … | kubectl apply`)
-on Substrate at or after `63a17a92` (the generated template names its sandbox
-class as the string `microvm` and declares limits, as the rest of ate-env does
-since #91; on an older cluster write the enum form `SANDBOX_CLASS_MICROVM` by
-hand), a `microvm` SandboxConfig (Substrate's `ate-setup` installs one),
+on Substrate at or after `0443aec3` (the WorkerPool alone chooses the sandbox:
+the template names no class and selects the `microvm` pool by its
+`ate-env/workerpool` label, as the rest of ate-env does), the access policy that
+ate-env's README step 1 creates, a `microvm` SandboxConfig (Substrate's
+`ate-setup` installs one),
 `kubectl`, `kubectl-ate`, `ate-env`, and the `openshell` CLI on your machine.
 
 1. **Images.** `make openshell-images` builds and pushes the layer (docker
@@ -71,7 +72,7 @@ hand), a `microvm` SandboxConfig (Substrate's `ate-setup` installs one),
    ate-env manifest template --template openshell-microvm \
      --guest-image "$GUEST_IMAGE" --snapshots-bucket "$SNAPSHOTS_BUCKET" \
      --layer openshell="$LAYER_IMAGE"=/opt/openshell \
-     --sandbox-class microvm --sandbox-config microvm \
+     --workerpool openshell-microvm-workerpool \
      --cap-add SETPCAP --cap-add SETUID --cap-add SETGID \
      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER \
      --cpu 1 --memory 1Gi | kubectl-ate create actor-template -f -
@@ -81,8 +82,9 @@ hand), a `microvm` SandboxConfig (Substrate's `ate-setup` installs one),
    SQLite on an emptyDir, plaintext API) with the driver image you pass. The
    capabilities are what OpenShell's capability-free launcher needs to switch
    from root to the workload identity; actors otherwise run with only KILL,
-   NET_BIND_SERVICE and AUDIT_WRITE. The template, pool and worker class must
-   agree (`microvm`), or actors never schedule.
+   NET_BIND_SERVICE and AUDIT_WRITE. The template's `--workerpool` must name
+   the microvm pool: without that selector a cold-booting actor can land on a
+   gVisor pool, where OpenShell's sandbox does not qualify.
 3. **Reach the gateway and let actors reach it.**
 
    ```bash

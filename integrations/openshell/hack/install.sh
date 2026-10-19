@@ -47,20 +47,21 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 
 step() { printf '\n== %s\n' "$*"; }
 
-step "SandboxConfig ${SANDBOX_CONFIG} (the microVM class the pool and the template name)"
+step "SandboxConfig ${SANDBOX_CONFIG} (the microVM class the pool names)"
 if ! "$KUBECTL" "${ctx[@]}" get sandboxconfigs.ate.dev "$SANDBOX_CONFIG" >/dev/null 2>&1; then
   echo "warning: no SandboxConfig named ${SANDBOX_CONFIG} found; the pool will not become ready without one" >&2
 fi
 
 step "WorkerPool ${NAMESPACE}/${WORKERPOOL}: ${REPLICAS} x ${WORKER_IMAGE}"
 sed -e "s|^  name: .*|  name: ${WORKERPOOL}|" \
+    -e "s|^    ate-env/workerpool: .*|    ate-env/workerpool: ${WORKERPOOL}|" \
     -e "s|^  namespace: .*|  namespace: ${NAMESPACE}|" \
     -e "s|^  replicas: .*|  replicas: ${REPLICAS}|" \
     -e "s|^      name: .*|      name: ${SANDBOX_CONFIG}|" \
     -e "s|^  workerImage: .*|  workerImage: ${WORKER_IMAGE}|" \
     "$here/deploy/workerpool.yaml" | "$KUBECTL" "${ctx[@]}" apply -f -
 
-step "ActorTemplate ${ATESPACE}/${TEMPLATE}: guest + OpenShell layer, class microvm, ${CPU} CPU, ${MEMORY}"
+step "ActorTemplate ${ATESPACE}/${TEMPLATE}: guest + OpenShell layer on pool ${WORKERPOOL}, ${CPU} CPU, ${MEMORY}"
 if "$KUBECTL_ATE" "${ctx[@]}" get actor-template "$TEMPLATE" -a "$ATESPACE" >/dev/null 2>&1 && [ "${FORCE:-0}" != 1 ]; then
   echo "template exists; set FORCE=1 to delete and recreate it (derived templates keep the old settings until recreated)"
 else
@@ -70,7 +71,7 @@ else
   "$ATE_ENV" manifest template --template "$TEMPLATE" --atespace "$ATESPACE" \
     --guest-image "$GUEST_IMAGE" --snapshots-bucket "$SNAPSHOTS_BUCKET" \
     --layer "openshell=${LAYER_IMAGE}=/opt/openshell" \
-    --sandbox-class microvm --sandbox-config "$SANDBOX_CONFIG" \
+    --workerpool "$WORKERPOOL" \
     --cap-add SETPCAP --cap-add SETUID --cap-add SETGID --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER \
     --cpu "$CPU" --memory "$MEMORY" \
     | "$KUBECTL_ATE" "${ctx[@]}" create actor-template -f -

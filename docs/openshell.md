@@ -162,12 +162,14 @@ OpenShell template or expect the gateway to notice a lost supervisor.
 
 ## Requirements
 
-- Substrate at or after `63a17a92` (string sandbox class, required limits),
-  and a WorkerPool of the `microvm` class whose worker image was built from
-  the same Substrate commit as the cluster.
-- A base ActorTemplate from `ate-env manifest template --sandbox-class microvm
-  --sandbox-config <name> --layer openshell=<layer>@sha256:…=/opt/openshell
-  --cap-add SETPCAP --cap-add SETUID … --cpu 1 --memory 1Gi`.
+- Substrate at or after `0443aec3` (the WorkerPool chooses the sandbox; the
+  template names none), and a WorkerPool of the `microvm` class, labeled
+  `ate-env/workerpool: <pool>`, whose worker image was built from the same
+  Substrate commit as the cluster.
+- A base ActorTemplate from `ate-env manifest template --workerpool <pool>
+  --layer openshell=<layer>@sha256:…=/opt/openshell --cap-add SETPCAP
+  --cap-add SETUID … --cpu 1 --memory 1Gi`. The selector keeps the actors on
+  the microvm pool; without it a cold boot can land on a gVisor pool.
 - A gateway reachable from the actors' egress path, and an EgressPolicy per
   OpenShell actor that allows `http` to the gateway host and port.
 - Images pinned by digest.
